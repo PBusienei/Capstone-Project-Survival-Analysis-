@@ -1,0 +1,496 @@
+---
+title: "Survival Analysis"
+output: html_notebook
+---
+
+```{r}
+#install.packages(c("survival", "survminer"))
+library(magrittr)
+library(tidyr)
+library(VIM)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+library(readr)
+library("survival")
+library("survminer")
+
+```
+
+# http://www.sthda.com/english/wiki/survival-analysis-basics
+
+# https://www.youtube.com/watch?v=qt2ufTPCWwI
+
+
+
+```{r}
+# Load the data
+df <- read.csv("new_variables_df.csv")
+```
+
+# top 5 rows
+```{r}
+head(df)
+```
+
+# Histogram of survival
+```{r}
+hist(df$timetoeventcvddate, xlab = "Length of Event Time", main = "Histogram of Event Time in Offspring cohort")
+```
+We see that the event time are slightly skewed due to the fact that events tend to happen at a latter date in life and the offspring cohort had a accesibility of healthcare and more informed than the parent cohort. 
+
+
+
+```{r}
+data12 <- df[complete.cases(df), ]
+fit <- survfit(Surv(timetoeventcvddate, cvd) ~ sex, data = data12)
+print(fit)
+```
+This tells us that for the 1758 male in the offpsring cohort, 716 were uncensored (followed for the entire time, until occurance of an event). Of the 1828 women in the offspring cohort 496 were uncensored. Male have a median of 82 years survival time and Female have a median of 88 years survival time. The 95% confidence interval for the median survival time for 716 uncensored male is (80-83) whereas for female is (87-91) 
+
+
+```{r}
+summary(survfit(Surv(timetoeventcvddate, cvd) ~ sex, data = data12))
+```
+
+
+```{r}
+data12 = df %>% mutate(alload_cat =
+                     case_when(alload <= 3 ~ 0, 
+                                alload >3 & alload <=7  ~ 1,
+                                alload >7 & alload <= 10  ~ 2,
+                                
+                               ))
+```
+
+# Compute survival curves: survfit()
+
+```{r}
+data12 <- df[complete.cases(df), ]
+fit <- survfit(Surv(timetoeventcvddate, cvd) ~ alload+sex, data = data12)
+print(fit)
+```
+
+```{r}
+data11 <- df[ , c("sex","cvd", "alload",  "timetoeventcvddate")]
+
+head(data11)
+```
+```{r}
+ data11 <- data11[complete.cases(data11), ]
+```
+
+
+
+# Compute survival curves: survfit()
+
+```{r}
+fit2 <- survfit(Surv(timetoeventcvddate, cvd) ~ sex +alload, data = data11)
+print(fit2)
+```
+
+```{r}
+# Summary of survival curves
+summary(fit2)
+# Access to the sort summary table
+summary(fit2)$table
+```
+
+
+```{r}
+d <- data.frame(time = fit$time,
+                  n.risk = fit$n.risk,
+                  n.event = fit$n.event,
+                  n.censor = fit$n.censor,
+                  surv = fit$surv,
+                  upper = fit$upper,
+                  lower = fit$lower
+                  )
+head(d)
+```
+
+
+
+```{r}
+# Change color, linetype by strata, risk.table color by strata
+ggsurvplot(fit,title="Survival by Sex in 'Cardiovascular' allostatic load", xlab = "Follow Up Time (Years)",
+          pval = TRUE,
+          pval.method=FALSE, 
+          conf.int = FALSE,
+          risk.table = TRUE, # Add risk table
+          risk.table.pos="out",
+          risk.table.y.text.col=FALSE,
+          risk.table.col = "strata",# Change risk table color by groups
+          #legend.title="Sex",
+          linetype = "strata", # Change line type by groups
+          surv.median.line = "hv", # Specify median survival
+          ggtheme = theme_classic2(base_size=8, base_family = "Arial"),
+           font.family = "Arial", # Change ggplot2 theme
+          palette = c("red", "blue", "yellow", "green", "orange", "purple")
+          )
+
+```
+
+
+
+
+```{r}
+fit2 <- survfit(Surv(timetoeventcvddate, cvd) ~ sex +alload, data = data12)
+
+p <- ggsurvplot(fit2, title="Survival by Sex in 'Cardiovascular' Data", xlab = "Follow Up Time (Years)",
+  conf.int = FALSE, 
+  pval=TRUE, 
+  pval.method=TRUE, 
+  risk.table=TRUE,
+  risk.table.pos="out",
+  risk.table.col="black",
+  risk.table.y.text.col=FALSE,
+  tables.theme = theme_cleantable(),
+  #legend.labs=c("Male","Female"),
+  font.tickslab = c(8),
+  legend.title="Sex",
+  ggtheme = theme_classic2(base_size=8, base_family = "Arial"),
+           font.family = "Arial"
+)
+ggpar(p, 
+      font.main = c(8),
+      font.x = c(8),
+      font.y = c(8),
+      font.caption = c(8), 
+      font.legend = c(8), 
+      font.tickslab = c(8))
+```
+
+# Cox-PH model
+
+```{r}
+colnames(data12)
+```
+
+
+```{r}
+cox.mod <- coxph( Surv(timetoeventcvddate, cvd) ~sex + age1+ bmi_imp +years_of_education + sbp+ dbp+ alb + s_creatinine_imp+creat+crp_imp+tchol+hba1c+hdlchol+hdlchol_ratio+educ+maritalst, data = data12)
+```
+
+```{r}
+summary(cox.mod)
+```
+
+# Only use a subset of columns
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+# Using Cox Proportional Hazard Model 
+```{r}
+cph = CoxPHFitter()
+cph.fit
+```
+
+
+#Count the cvd events for males and Females
+
+```{r}
+
+ table(data12$cvd, data12$sex)
+#offcvd_events<- filter(data12, cvd==1)
+#head(offcvd_events,2)
+```
+
+
+# Compute survival curves: survfit()
+
+```{r}
+fit2 <- survfit(Surv(timetoeventcvddate, cvd) ~ sex, data = data12)
+print(fit2)
+```
+
+
+```{r}
+d2 <- data.frame(time2 = fit2$time,
+                  n.risk2 = fit2$n.risk,
+                  n.event2 = fit2$n.event,
+                  n.censor2 = fit2$n.censor,
+                  surv2 = fit2$surv,
+                  upper2 = fit2$upper,
+                  lower2 = fit2$lower
+                  )
+head(d2)
+```
+
+
+```{r}
+# Change color, linetype by strata, risk.table color by strata
+ggsurvplot(fit2,
+          pval = TRUE, conf.int = TRUE,
+          risk.table = TRUE, # Add risk table
+          risk.table.col = "strata", # Change risk table color by groups
+          linetype = "strata", # Change line type by groups
+          surv.median.line = "hv", # Specify median survival
+          ggtheme = theme_bw(), # Change ggplot2 theme
+          palette = c("#E7B800", "#2E9FDF"))
+```
+
+```{r}
+ggsurvplot(
+   fit2,                     # survfit object with calculated statistics.
+   pval = TRUE,             # show p-value of log-rank test.
+   conf.int = TRUE,         # show confidence intervals for 
+                            # point estimaes of survival curves.
+   conf.int.style = "step",  # customize style of confidence intervals
+   xlab = "Time in days",   # customize X axis label.
+   break.time.by = 100,     # break X axis in time intervals by 200.
+   ggtheme = theme_light(), # customize plot and risk table with a theme.
+   risk.table = "abs_pct",  # absolute number and percentage at risk.
+  risk.table.y.text.col = T,# colour risk table text annotations.
+  risk.table.y.text = FALSE,# show bars instead of names in text annotations
+                            # in legend of risk table.
+  ncensor.plot = TRUE,      # plot the number of censored subjects at time t
+  surv.median.line = "hv",  # add the median survival pointer.
+  legend.labs = 
+    c("Male", "Female"),    # change legend labels.
+  palette = 
+    c("#E7B800", "#2E9FDF") # custom color palettes.
+)
+```
+
+```{r}
+ggsurvplot(fit2,
+          conf.int = TRUE,
+          risk.table.col = "strata", # Change risk table color by groups
+          ggtheme = theme_bw(), # Change ggplot2 theme
+          palette = c("#E7B800", "#2E9FDF"),
+          xlim = c(0, 600))
+```
+
+```{r}
+ggsurvplot(fit2,
+          conf.int = TRUE,
+          risk.table.col = "strata", # Change risk table color by groups
+          ggtheme = theme_bw(), # Change ggplot2 theme
+          palette = c("#E7B800", "#2E9FDF"),
+          fun = "event")
+```
+
+```{r}
+ggsurvplot(fit2,
+          conf.int = TRUE,
+          risk.table.col = "strata", # Change risk table color by groups
+          ggtheme = theme_bw(), # Change ggplot2 theme
+          palette = c("#E7B800", "#2E9FDF"),
+          fun = "cumhaz")
+```
+
+```{r}
+res.sum <- surv_summary(fit2)
+head(res.sum)
+```
+
+```{r}
+require("survival")
+fit3 <- survfit( Surv(timetoeventcvddate, cvd) ~ sex + bmi_imp + hba1c,
+                data = data12 )
+```
+
+
+```{r}
+# Plot survival curves by sex and facet by bmi and spb
+ggsurv <- ggsurvplot(fit3, fun = "event", conf.int = TRUE,
+                     ggtheme = theme_bw())
+   
+ggsurv$plot +theme_bw() + 
+  theme (legend.position = "right")+
+  facet_grid(bmi_imp ~ hba1c)
+```
+
+```{r}
+ggsurvplot(fit2, surv.median.line = "hv")
+```
+
+
+```{r}
+ggsurvplot(fit2, conf.int=TRUE, pval=TRUE, risk.table=TRUE, 
+           legend.labs=c("Male", "Female"), legend.title="Sex",  
+           palette=c("dodgerblue2", "orchid2"), 
+           title="Kaplan-Meier Curve for Cardiovsacular Survival", 
+           risk.table.height=.25)
+```
+
+```{r}
+ggsurvplot(survfit(Surv(timetoeventcvddate, cvd)~hba1c_cat, data=offcvd_events), pval=TRUE,  surv.median.line = "hv")
+```
+
+```{r}
+
+
+ggsurvplot(survfit(Surv(timetoeventcvddate, cvd)~alb_cat, data=offcvd_events), pval=TRUE,  surv.median.line = "hv")
+```
+
+# Kaplan-Meier estimate
+
+
+```{r}
+# Estimate the survivor function pretending that all censored observations are actual observations.
+km_wrong <- survfit(Surv(timetoeventcvddate) ~ 1, data = offcvd_events)
+```
+
+
+```{r}
+# Estimate the survivor function from this dataset via kaplan-meier
+km <- survfit(Surv(timetoeventcvddate, cvd) ~1, data=offcvd_events)
+```
+
+```{r}
+ggsurvplot_combine(list(correct = km, wrong = km_wrong))
+```
+```{r}
+ggsurvplot(km)
+
+# Add the risk table to plot
+# ggsurvplot(km, risk.table = TRUE)
+
+# Add a line showing the median survival time
+ggsurvplot(km, risk.table = TRUE, surv.median.line = "hv")
+```
+
+```{r}
+# Weibull model
+wb <- survreg(Surv(timetoeventcvddate, cvd) ~ 1, data = offcvd_events)
+
+# Compute the median survival from the model
+predict(wb, type = "quantile", p = 1-0.5, newdata = data.frame(1))
+```
+
+Half the patients live longer than 65 years and half die before.
+
+```{r}
+# 70 Percent of patients survive beyond time point...
+predict(wb, type = "quantile", p = 1-0.7, newdata = data.frame(1))
+```
+
+70 out of 100 people survive more than 57.5 years.
+
+```{r}
+# Retrieve survival curve from model probabilities 
+surv <- seq(.99, .01, by = -.01)
+
+# Get time for each probability
+t <- predict(wb, type = "quantile", p = 1-surv, newdata = data.frame(1))
+
+# Create data frame with the information
+surv_wb <- data.frame(time = t, surv = surv)
+
+# Look at first few lines of the result
+head(data.frame(time=t, surv=surv))
+```
+
+Survival curve goes down with time.
+
+
+```{r}
+# Create data frame with the information needed for ggsurvplot_df
+surv_wb <- data.frame(time = t, surv = surv, 
+  upper = NA, lower = NA, std.err = NA)
+
+# Plot
+ggsurvplot_df(fit = surv_wb, surv.geom = geom_line)
+```
+
+```{r}
+# Estimate a Weibull model
+wbmod <- survreg(Surv(timetoeventcvddate, cvd) ~ sex, data = offcvd_events)
+coef(wbmod)
+```
+
+
+```{r}
+# Weibull model
+wbmod <- survreg(Surv(timetoeventcvddate,  cvd) ~ alb_cat + hba1c_cat, data = offcvd_events)
+
+# Imaginary patients
+newdat <- expand.grid(
+  albumin = levels(offcvd_events$alb_cat),
+  hba1c = quantile(offcvd_events$bmi, probs = c(0.25, 0.5, 0.75)))
+newdat
+```
+
+```{r}
+# Compute survival curves
+surv <- seq(.99, .01, by = -.01)
+t <- predict(wbmod, type = "quantile", p = 1-surv,
+  newdata = newdat)
+```
+
+```{r}
+# Use cbind() to combine the information in newdat with t
+surv_wbmod_wide <- cbind(newdat, t)
+  
+# Use melt() to bring the data.frame to long format
+surv_wbmod <- melt(surv_wbmod_wide, id.vars = c("horTh", "tsize"), variable.name = "surv_id", value.name = "time")
+```
+
+```{r}
+# Use surv_wbmod$surv_id to add the correct survival probabilities surv
+surv_wbmod$surv <- surv[as.numeric(surv_wbmod$surv_id)]
+```
+
+```{r}
+# Add columns upper, lower, std.err, and strata to the data.frame
+surv_wbmod[, c("upper", "lower", "std.err", "strata")] <- NA
+
+# Plot the survival curves
+ggsurvplot_df(surv_wbmod, surv.geom = geom_line,
+  linetype = "horTh", color = "tsize", legend.title = NULL)
+```
+
+
+
+```{r}
+# Weibull model
+wbmod <- survreg(Surv(timetoeventcvddate, cvd) ~ educ, data = offcvd_events)
+
+# Log-Normal model
+lnmod <- survreg(Surv(timetoeventcvddate, cvd) ~ educ, data = offcvd_events, dist = "lognormal")
+
+# Newdata
+newdat <- data.frame(education = levels(offcvd_events$educ))
+
+# Surv
+surv <- seq(.99, .01, by = -.01)
+
+# Survival curve from Weibull model and log-normal model
+wbt <- predict(wbmod, type = "quantile", p = 1-surv, newdata = newdat)
+lnt <- predict(lnmod, type = "quantile", p = 1-surv, newdata = newdat)
+```
+
+
+```{r}
+# Melt the data.frame into long format.
+surv_long <- melt(surv_wide, id.vars = c("horTh", "dist"), variable.name = "surv_id", value.name = "time")
+
+# Add column for the survival probabilities
+surv_long$surv <- surv[as.numeric(surv_long$surv_id)]
+
+# Add columns upper, lower, std.err, and strata contianing NA values
+surv_long[, c("upper", "lower", "std.err", "strata")] <- NA
+```
+
+
+
+```{r}
+# Plot the survival curves
+ggsurvplot_df(surv_long, surv.geom =geom_line,
+              linetype = "horTh", color = "dist", legend.title = NULL)
+```
+
+
+
