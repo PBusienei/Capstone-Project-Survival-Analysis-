@@ -46,7 +46,7 @@ We determined that the missing data was missing completely at random (MCAR). We 
 Table below provides the variables used during the project and the percentage of missing values. Creatine and body mass index were the two variables with the highest missing values. As stated above, all the variables of interest were imputed using multiple imputation method. Systolic and Diastolic blood pressure had the least percentage of values missing because it has always been one of the basic components for vital checkup.
 
 ![image](images/imputation.png)
-
+The figure above shows the imputed data overlay, where the original values are in blue color, and imputed values are in red color.
 
 ## Analysis/Results
 
@@ -67,7 +67,6 @@ The above chart (Table 8) shows the Cox proportional hazard ratio forest plot fo
 
 
 ## Improving the accuracy
-
 The use of gradient boosting on Cox’s partial likelihood restricts regression trees base learners to only using a single split (the stumps). This model achieves a concordance index of 0.703 on the test data. The test performance changes with the ensemble size (n_estimators) (Figure 1). The performance improves quickly, but then it starts to decrease if the ensemble becomes too big. On the other hand, using component-wise least squares base learners (Figure 2), the performance increase is slower, but its maximum performance is above that of the ensemble of tree-based learners. This is because with component-wise least squares base learners, the overall ensemble is a linear model, while with tree-based learners it is be a non-linear model. Figures 1 and 2 shows the difference between the ensemble tree-based learners and the component-wise least squares base learners.
 
 ![ensemble_tree_base](images/ensemble_tree_based_learners.png)           ![pair_wise](images/pair_wise_tree_base_learners.png)
