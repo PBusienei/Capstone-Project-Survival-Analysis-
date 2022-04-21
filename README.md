@@ -1,10 +1,3 @@
-# Capstone-Project-Survival-Analysis
-This is my master's Capstone project on time to event of the offspring cohort of Framingham study
-
-[![arXiv](https://img.shields.io/badge/arXiv-22108.07258-f9f107.svg)](https://arxiv.org/abs/2108.07258)
-
-![image](images/whyresearch.png)
-
 # Time to onset of cardiovascular disease using Allostatic load
 
 ## Executive Summary
@@ -77,4 +70,4 @@ The above chart (Table 8) shows the Cox proportional hazard ratio forest plot fo
 
 The use of gradient boosting on Cox’s partial likelihood restricts regression trees base learners to only using a single split (the stumps). This model achieves a concordance index of 0.703 on the test data. The test performance changes with the ensemble size (n_estimators) (Figure 1). The performance improves quickly, but then it starts to decrease if the ensemble becomes too big. On the other hand, using component-wise least squares base learners (Figure 2), the performance increase is slower, but its maximum performance is above that of the ensemble of tree-based learners. This is because with component-wise least squares base learners, the overall ensemble is a linear model, while with tree-based learners it is be a non-linear model. Figures 1 and 2 shows the difference between the ensemble tree-based learners and the component-wise least squares base learners.
 
-        ![image](images/ensemble_tree_based_learners.png)           ![image](images/pair_wise_tree_base_learners.png)
+![ensemble_tree_base](images/ensemble_tree_based_learners.png)           ![pair_wise](images/pair_wise_tree_base_learners.png)
