@@ -1,0 +1,268 @@
+---
+title: "Variables_transformations"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+# Libraries 
+
+
+```{r}
+library(magrittr)
+library(tidyr)
+library(VIM)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+```
+
+# Load the dataset
+
+```{r}
+imputed_df <- read_csv("~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Offspring cohort/imputed_data.csv")
+#View(imputed_df)
+```
+
+```{r}
+View(imputed_df)
+```
+
+# top 5 
+
+```{r}
+head(imputed_df)
+```
+
+# generating fasting glucose, defined  if fasting more than 6 hours (g3a453) and glucose levels (g3a715)
+
+```{r}
+head(imputed_df$a31)
+```
+
+# convert fpg to a1c using the following formular used for eAG (note eAG and FPG are highly correlated) A1C(%) = (Estimated average glucose(mg/dL) +46.7) / 28.7
+# https://ebmcalc.com/GlycemicAssessment.htm
+
+```{r}
+
+```
+
+# defining education: G3A491 WHAT IS THE HIGHEST DEGREE OR LEVEL OF SCHOOL YOU HAVE COMPLETED? 0 = NO SCHOOLING1 = GRADES 1-82 = GRADES 9-113 = COMPLETED HIGH SCHOOL (12TH GRADE) OR GED4 = SOME COLLEGE BUT NO DEGREE5 =TECHNICAL SCHOOL CERTIFICATE6 =ASSOCIATE DEGREE (JUNIOR COLLEGE AA,AS)7 =BACHELOR'S DEGREE (BA,AB,BS)8 = GRADUATE OR PROFESSIONAL DEGREE (MASTER'S, DOCTORATE, MD, ETC.). = PREFER NOT TO ANSWER/UNKNOWN (16)
+
+```{r}
+
+```
+
+# reclassify education the following categories:1 elementary 2 high school; 3 some college/asscdegree, 4 college degree (bachelor/graduate)
+
+```{r}
+imputed_df <-imputed_df %>% 
+  mutate(BMI_categories = 
+           case_when(education_classification = "elementary" ~ "1",
+                     education_classification = "high school"  ~ "2",
+                     education_classification = "some college/asscdegree" ~ "3",
+                     education_classification = "college degree" ~ "4"
+                     
+                     ))
+```
+
+# generating income variable from G3A497PLEASE SELECT WHICH INCOME GROUP BEST REPRESENTS YOUR COMBINEDFAMILY INCOME FOR THE PAST 12 MONTHS.1 = UNDER $12,0002 = $ 12,000 -$ 24,0003 = $ 25,000 -$ 49,9994 = $ 50,000 -$ 74,9995 =$ 75,000 -$ 100,0006 =OVER $ 100,000. = PREFER NOT TO ANSWER/UNKNOWN (196)
+
+```{r}
+imputed_df <-imputed_df %>% 
+  mutate(BMI_categories = 
+           case_when(G3A497 >= 100,0002 & G3A497 <=149 ~ "7",
+                     G3A497 >= 120 & G3A497 <=149 ~ "0.5",
+                     G3A497 >= 120 & G3A497 <=149 ~ "0.5",
+                     G3A497 >= 120 & G3A497 <=149 ~ "0.5",
+                     G3A497 >= 12,000 & G3A497 <=149 ~ "0.5",
+                     G3A497 < 12,000 ~ "1"
+                     
+                     ))
+```
+
+
+# generating marital status from var g3a482
+
+```{r}
+
+```
+
+
+# generating bmi from weight in pounds (g3a444) and height inches code=G3A446
+
+```{r}
+
+```
+
+# convert weight lbs to wt in kgs=lbs/2.2046
+
+```{r}
+
+```
+
+# convert ht inches to ht meters=inches*0.0254
+
+```{r}
+
+```
+
+# calculate bmi by formula=BMI = kg/m2
+
+```{r}
+
+```
+
+# first gen ht_m squared
+
+```{r}
+
+```
+
+# generating blood pressure-start with SBP from combination of average of three variables 1, 2nd and 3rd reading of SBP (G3A290, 347,456) and then three readings of DBP
+
+```{r}
+imputed_df$sbp <- rowMeans(imputed_df[, c("a53","a55","a57")], na.rm = TRUE)
+imputed_df$dbp <- rowMeans(imputed_df[, c("a54","a56","a58")], na.rm = TRUE)
+```
+
+```{r}
+
+imputed_df$dbp <- rowMeans(imputed_df[, c("a54","a56","a58")], na.rm = TRUE)
+```
+
+
+```{r}
+#sum(imputed_df$a53, na.rm = TRUE)
+
+dim(imputed_df)
+```
+
+# Total N of a55
+
+```{r}
+sapply(imputed_df$a55, na.rm = TRUE)
+```
+```{r}
+summary(imputed_df)
+```
+
+
+# Generate systolic blood pressure (sbp) 1=high=≥150 0.5=mod= 120 to 149 0=low=<120 
+
+```{r}
+imputed_df <-imputed_df %>% 
+  mutate(BMI_categories = 
+           case_when(a55 >= 150 ~ "1",
+                     a55 >= 120 & a55 <=149 ~ "0.5",
+                     a55 < 120 ~ "0"
+                     
+                     ))
+```
+
+# Generate diastolic blood pressure dbp 1=high=≥90 0.5=mod= 80 to 89 0=low=<120 ≥80 ?????????
+
+```{r}
+imputed_df <-imputed_df %>% 
+  mutate( sbp_cat = 
+           case_when(a56 >= 90 ~ "1",
+                     a56 >= 80 & a56 <= 89 ~ "0.5",
+                     a56 < 80 ~ "0"
+                     
+                     ))
+```
+
+# Creating tchol and hdlchol variables
+
+```{r}
+
+
+imputed_df$tchol <- imputed_df$a9
+
+imputed_df$hdlchol <- imputed_df$a10
+
+
+```
+
+
+```{r}
+imputed_df$thdlchol_ratio <- imputed_df$tchol/ imputed_df$hdlchol
+```
+
+```{r}
+#range(imputed_df$thdlchol_ratio)
+colnames(imputed_df)
+```
+
+# generating HDL cholesterol 1=high<40 0.5=40-59 low risk>60
+
+```{r}
+imputed_df <-imputed_df %>% 
+  mutate(hdl_cat = 
+           case_when(hdlchol < 40 ~ "1", 
+                     hdlchol >= 40 & a10 <=59 ~ "0.5",
+                     hdlchol > 60 ~ "0"
+                     
+                     ))
+```
+
+
+# generating total cholesterol 1=high≥240 0.5=200 to 239 low risk=<200
+
+```{r}
+imputed_df <-imputed_df %>% 
+  mutate(tchol_cat = 
+           case_when(tchol >=240 ~ "1",
+                    tchol >= 200 &  tchol < 239 ~ "0.5",
+                      tchol < 200 ~ "0"
+                     
+                     ))
+```
+
+
+
+# generating tchol/HDL ratio cholesterol 1=high>=6 0.5=mod= 5 to <6 0=low risk<5  
+
+```{r}
+imputed_df <-imputed_df %>% 
+  mutate(thdlchol_ratio = 
+           case_when(a9 >=6 ~ "1",
+                     a9 >= 5 & a9 <6 ~ "0.5",
+                     a9 < 5 ~ "0"
+                     
+                     ))
+```
+
+# generating BMI_categories 1=high=≥30=poor kg/m2, 0.5=25–<30 kg/m2, 0= <25 kg/m2
+
+```{r}
+
+ #thdlchol_ratio= tchol/hdlchol
+imputed_df2 <-imputed_df %>% 
+  mutate(bmi_cat = 
+           case_when(bmi >=30 ~ "1",
+                     bmi >= 25 & bmi <30 ~ "0.5",
+                     bmi < 25 ~ "0"
+                     
+                     ))
+
+#1=high=≥30=poor kg/m2
+
+#0.5=25–<30 kg/m2,
+#0= <25 kg/m2
+```
+
+
+```{r}
+imputed_df2[c(150, 215)]
+```
+```{r}
+mean(imputed_df2$bmi)
+```
+```{r}
+freq <- table(imputed_df2$bmi_cat)
+```
+
+```{r}
+print(freq)
+```
+

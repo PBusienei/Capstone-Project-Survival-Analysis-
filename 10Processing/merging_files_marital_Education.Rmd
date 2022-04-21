@@ -1,0 +1,1634 @@
+---
+title: "merging education and marital status file with combined file"
+output: html_notebook
+---
+
+
+
+```{r}
+library(magrittr)
+library(tidyr)
+library(VIM)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+library(readr)
+```
+
+
+# Load the merged dataset
+
+```{r}
+
+combined_offspring <- read_csv("~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Offspring cohort/Combined_off 3-2-22.csv")
+marital_education_file <- read_csv("~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Offspring cohort/EX1_2D_V3.csv")
+
+  
+```
+#Top 5
+
+```{r}
+head(combined_offspring)
+```
+# summary of variables
+
+```{r}
+summary(combined_offspring$bmi)
+```
+
+```{r}
+summary(combined_offspring$s_creatinine)
+```
+
+
+
+# get the marital status and education level with pid
+
+```{r}
+demographics_marital_education <- marital_education_file %>% select(PID, B39, B43)
+head(demographics_marital_education, 10)
+```
+```{r}
+
+unique(demographics_marital_education[c("B43")])  
+```
+```{r}
+unique(demographics_marital_education[c("B39")])  
+```
+
+
+
+# convert fpg to a1c using the following formular used for eAG (note eAG and FPG are highly correlated) A1C(%) = (Estimated average
+
+
+
+# Column headers to lower case for demographics
+
+```{r}
+for(i in 1:length(colnames(demographics_marital_education))){
+  colnames(demographics_marital_education)[i] = tolower(colnames(demographics_marital_education)[i])
+}
+  
+  
+head(demographics_marital_education, 2)
+```
+
+
+# Merging the files demographics
+
+```{r}
+merged_df <- merge(combined_offspring, demographics_marital_education, by="pid", all=T)
+
+# check dimensions
+dim(merged_df)
+```
+
+
+```{r}
+summary(merged_df$bmi)
+```
+
+```{r}
+colMeans(is.na(merged_df))*100
+```
+
+
+# Find the row means for Systolic and Diastolic
+
+```{r}
+merged_df$sbp <- rowMeans(merged_df[,c('a53', 'a55')], na.rm=TRUE)
+
+```
+
+
+```{r}
+merged_df$dbp <- rowMeans(merged_df[,c('a55', 'a56')], na.rm=TRUE)
+```
+
+
+#  Recode Cholesterol
+
+```{r}
+# Rename a9 to tchol
+merged_df <- merged_df %>%
+  rename(tchol=a9)
+```
+
+#  Recode HDL
+
+```{r}
+# Rename a10 to hdlchol
+merged_df <- merged_df %>%
+  rename(hdlchol=a10)
+```
+
+# Rename marital status and education column
+
+```{r}
+merged_df <- merged_df %>%
+  rename(marital_status = b39,
+         years_of_education = b43)
+
+```
+
+
+
+# Subset variables for multiple imputation
+```{r}
+# Select out variables that could bd used in the imputation process
+off_cohort_imp <- merged_df %>% 
+  select(pid,idtype, age1, crp, hba1c, alb, tchol, s_creatinine, hdlchol,bmi, sbp, dbp)
+head(off_cohort_imp)
+```
+
+
+```{r}
+dim(off_cohort_imp)
+```
+
+
+# The distribution of ALbumin against cholesterol
+
+```{r}
+marginplot(off_cohort_imp[c(7,10)])
+```
+
+
+# mean of s_creatinine
+```{r}
+summary(off_cohort_imp$s_creatinine)
+```
+
+
+
+# mean of bmi
+```{r}
+summary(off_cohort_imp$bmi)
+```
+
+
+# mean of crp
+```{r}
+summary(off_cohort_imp$crp)
+```
+
+
+
+# What values are we missing
+
+```{r}
+
+library(VIM)
+aggr_plot <- aggr(off_cohort_imp, col=c('lightblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(off_cohort_imp), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+```
+
+# Percenatge of missing data in each column
+
+```{r}
+colMeans(is.na(off_cohort_imp))*100
+```
+
+
+
+
+
+# Multiple Imputation
+
+```{r}
+library(mice)
+# We run the mice code with 0 iterations 
+
+imp3 <- mice(off_cohort_imp, maxit=0)
+
+
+# Extract predictorMatrix and methods of imputation 
+
+predM2 <- imp3$predictorMatrix
+meth <- imp3$method
+
+
+# Setting values of variables I'd like to leave out to 0 in the predictor matrix
+predM2[, c("pid")] <- 0
+predM2[, c("idtype")] <- 0
+
+imp4 <- mice(off_cohort_imp, maxit = 5, 
+             predictorMatrix = predM2, 
+             method = meth, print =  FALSE)
+```
+
+
+
+
+```{r}
+ head(predM2)
+```
+
+
+
+
+```{r}
+# Look at head and tail of imputed values for alb variable
+head(imp4$imp$bmi)
+
+```
+
+
+```{r}
+# Look at head and tail of imputed values for alb variable
+tail(imp4$imp$bmi)
+
+```
+# Find the means of imputed bmi columns and compare with mean of bmi un-imputed =  25.67 
+
+```{r}
+mean(imp4$imp$bmi[, 1])
+```
+
+```{r}
+mean(imp4$imp$bmi[, 2])
+```
+
+```{r}
+mean(imp4$imp$bmi[, 3])
+```
+
+```{r}
+mean(imp4$imp$bmi[, 4])
+```
+
+
+```{r}
+mean(imp4$imp$bmi[, 5])
+```
+
+
+# Find the means of imputed s_creatinine columns and compare with mean of s_creatinine un-imputed =   0.902  
+
+```{r}
+mean(imp4$imp$s_creatinine [, 1])
+```
+
+```{r}
+mean(imp4$imp$s_creatinine[, 2])
+```
+
+```{r}
+mean(imp4$imp$s_creatinine[, 3])
+```
+
+```{r}
+mean(imp4$imp$s_creatinine[, 4])
+```
+
+
+```{r}
+mean(imp4$imp$s_creatinine[, 5])
+```
+
+
+# Find the means of imputed crp columns and compare with mean of crp un-imputed =  2.759    
+
+```{r}
+mean(imp4$imp$crp [, 1])
+```
+
+```{r}
+mean(imp4$imp$crp[, 2])
+```
+
+```{r}
+mean(imp4$imp$crp[, 3])
+```
+
+```{r}
+mean(imp4$imp$crp[, 4])
+```
+
+
+```{r}
+mean(imp4$imp$crp[, 5])
+```
+
+
+
+
+
+# IN specting the distribution of original and imputed data
+
+```{r}
+xyplot(imp4, alb ~ crp + hba1c+ tchol+ s_creatinine + hdlchol+ bmi+ sbp+ dbp, pch=18, cex=1)
+
+```
+What we would like to see is that the shape of the magenta points(imputed) matches the shape of the blue ones (observed). The matching shape tells us that the imputed values are indeed "plausible value". 
+
+
+# Another helpful plot
+
+```{r}
+densityplot(imp4)
+```
+
+The density of the imputed data for each imputed dataset is showed in magenta, while the density of the observed data is showed in blue. From the previous assumption we expect the distribution to be similar. 
+
+
+# Stripplot
+
+```{r}
+stripplot(imp4, pch=20, cex=1.2)
+```
+
+
+```{r}
+modelFit2 <- with(imp4,lm(bmi~ crp + hba1c + sbp))
+summary(pool(modelFit2))
+```
+
+
+# Create complete dataset dataframe
+
+```{r}
+completeData2 <- complete(imp4,4)
+
+head(completeData2)
+```
+
+
+# Subset variables for multiple imputation
+```{r}
+# Select out variables that could bd used in the imputation process
+imputed_off_cohort<- completeData2 %>% 
+  select(pid,bmi, s_creatinine, crp)
+head(imputed_off_cohort)
+```
+
+# rename the columns
+```{r}
+renamed_imputed_off_cohort <- imputed_off_cohort %>% 
+  rename(
+    bmi_imp = bmi,
+    s_creatinine_imp =s_creatinine,
+    crp_imp = crp
+    )
+
+head(renamed_imputed_off_cohort)
+```
+
+
+
+```{r}
+summary(renamed_imputed_off_cohort)
+```
+
+
+# save it to a dataframe
+
+```{r}
+write.csv(renamed_imputed_off_cohort, "ImputedOffspringData.csv")
+```
+
+
+# Merging the files demographics
+
+```{r}
+Offspring_imp_clean_df <- merge(merged_df, renamed_imputed_off_cohort, by="pid", all=T)
+
+# check dimensions
+dim(Offspring_imp_clean_df)
+```
+
+
+
+# Subset variables for multiple imputation
+```{r}
+# Select out variables that could bd used in the imputation process
+off_cohort_imp2 <- Offspring_imp_clean_df %>% 
+  select(pid,idtype, age1, crp_imp, hba1c, alb, tchol, s_creatinine_imp, hdlchol,bmi_imp, sbp, dbp)
+head(off_cohort_imp2)
+```
+# reanme variables
+```{r}
+rename_imputed_offsp2 <- off_cohort_imp2 %>% 
+  rename(
+    bmi= bmi_imp,
+    s_creat =s_creatinine_imp,
+    crp = crp_imp
+    )
+
+```
+
+
+```{r}
+aggr_plot <- aggr(rename_imputed_offsp2, col=c('lightblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(rename_imputed_offsp2), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"), )
+```
+
+
+
+
+
+
+```{r}
+summary(Offspring_imp_clean_df$bmi_imp)
+```
+
+# save it to a dataframe
+
+```{r}
+write.csv(Offspring_imp_clean_df, "OffspringImputedData_clean.csv")
+```
+
+
+```{r}
+summary(Offspring_imp_clean_df$s_creatinine_imp)
+```
+
+
+```{r}
+summary(Offspring_imp_clean_df$crp_imp)
+```
+
+```{r}
+
+#merged_imp <- merged_df %>% 
+  #select(vars_by_NAs) %>% 
+  #kNN(variable = c("bmi", "s_creatinine", "crp"),
+      #k = 5)
+      #numFun = weighted.mean(),
+      #weightDist = TRUE)    
+```
+
+
+
+
+# marginplot
+```{r}
+Offspring_imp_clean_df %>% 
+  select(s_creatinine, bmi, bmi_imp) %>% 
+  marginplot(delimiter = "imp", main = "Imputed BMI vs Original BMI " , xlab = " S-Creatinine", ylab ="BMI")
+
+```
+
+# marginplot
+```{r}
+merged_imp %>% 
+  select(crp, s_creatinine, s_creatinine_imp) %>% 
+  marginplot(delimiter = "imp", main = "Imputed Serum Creatinine vs Serum Creatinine " , xlab = " Serum Creatinine", ylab ="CRP")
+```
+
+
+# Only rows with education and marital status dataframe
+
+```{r}
+Rows_with_marital_education_only <- merge(combined_offspring, demographics_marital_education, by="pid")
+
+dim(Rows_with_marital_education_only)
+```
+
+
+```{r}
+# Count the unique Elements in marital status column
+
+table(merged_df$b39)
+```
+
+
+
+
+#Generating Variables
+
+# Recode Systolic Blood Pressure
+
+```{r}
+
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(sbp_cat =
+                     case_when(sbp>=150 ~ 1, 
+                                sbp >= 120 & sbp < 150  ~ 0.5,
+                                sbp < 120 & sbp !="NA"  ~ 0
+                                
+                               ))
+
+```
+
+
+
+#  Recode Diastolic Blood Pressure
+
+```{r}
+
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(dbp_cat =
+                     case_when(dbp >= 90 ~ 1, 
+                                dbp >=80  & dbp < 90  ~ 0.5,
+                                dbp < 80  & dbp != "NA"  ~ 0
+                                
+                               ))
+
+```
+
+
+#  Recode Cholesterol
+
+```{r}
+
+
+
+
+Offspring_imp_clean_df= Offspring_imp_clean_df %>% mutate(tchol_cat =
+                     case_when(tchol >= 240 ~ 1, 
+                                tchol >= 200  & tchol <240  ~ 0.5,
+                                tchol < 200  & tchol != "NA"  ~ 0
+                                
+                               )
+)
+
+```
+
+
+
+
+```{r}
+
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(hdl_cat =
+                     case_when(hdlchol <40 & hdlchol !="NA" ~ 1, 
+                                hdlchol >= 40  & hdlchol <=59  ~ 0.5,
+                                hdlchol > 59  ~ 0
+                                
+                               ))
+
+```
+
+# The ratio of tchol/HDL
+
+```{r}
+
+Offspring_imp_clean_df$hdlchol_ratio <- Offspring_imp_clean_df$tchol/Offspring_imp_clean_df$hdlchol
+
+
+#merged_df = merged_df %>% mutate(hdlchol_ratio =
+                     #tchol/hdlchol)
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(hdlchol_ratio_cat =
+                     case_when(hdlchol_ratio < 5 & hdlchol_ratio !="NA" ~ 0, 
+                                hdlchol_ratio >= 5 & hdlchol_ratio <6  ~ 0.5,
+                                hdlchol_ratio >= 6 ~ 1
+                                
+                               ))
+
+
+
+
+```
+
+# Recode bmi
+
+```{r}
+
+Offspring_imp_clean_df= Offspring_imp_clean_df %>% mutate(bmi_cat =
+                     case_when(bmi_imp >= 30 ~ 1, 
+                                bmi_imp >= 25 & bmi_imp < 30  ~ 0.5,
+                                bmi_imp < 25  ~ 0
+                                
+                               ))
+
+```
+
+
+# Recode hba1c
+
+```{r}
+
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(hba1c_cat =
+                     case_when(hba1c >=6.5 ~ 1, 
+                                hba1c >= 5.7 & hba1c < 6.5  ~ 0.5,
+                                hba1c < 5.7 & hba1c !="NA"   ~ 0
+                                
+                               ))
+
+```
+
+# Recode albumin
+
+```{r}
+
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(alb_cat =
+                     case_when(alb < 3 & alb !="NA" ~ 1, 
+                                alb>=3 & alb < 3.8  ~ 0.5,
+                                alb>=3.8  ~ 0
+                               
+                               ))
+
+```
+
+
+# # Recode c-creatinine
+
+```{r}
+
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(creat_cat =
+                     case_when(s_creatinine_imp > 1.16 & sex ==1  ~ 1, 
+                                s_creatinine_imp > 0.93 & sex ==2  ~ 1,
+                                s_creatinine_imp >= 0.63 & s_creatinine_imp <=1.16  & sex ==1  ~ 0.5,
+                                s_creatinine_imp >= 0.48 & s_creatinine_imp <=0.93  & sex ==2  ~ 0.5,
+                                s_creatinine_imp < 0.63  & sex ==1 ~ 0,
+                                s_creatinine_imp < 0.48 & sex ==2 ~ 0
+                              
+                               )
+)
+
+```
+
+# Recode crp
+
+```{r}
+
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(crp_cat =
+                     case_when(crp_imp >3 ~ 1, 
+                                crp_imp >=1 & crp_imp <=3  ~ 0.5,
+                                crp_imp <1  ~ 0
+                               
+                               ))
+
+```
+
+
+```{r}
+head(Offspring_imp_clean_df)
+```
+
+
+
+## Recode the Years of education
+
+```{r}
+
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(educ =
+                     case_when(years_of_education <= 13 ~ "<high school", 
+                                years_of_education >= 14 & years_of_education <=18  ~ 'high school',
+                                years_of_education > 18 & years_of_education <= 22  ~ 'some college',
+                                years_of_education > 22   ~ 'college grad'
+                               )
+)
+
+```
+
+
+```{r}
+table(Offspring_imp_clean_df$educ)
+```
+
+# Recode marital status
+
+```{r}
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(maritalst =
+                     case_when(marital_status == 2 ~ 1, 
+                                marital_status == 1  ~ 2,
+                                marital_status == 3  ~ 3,
+                                marital_status == 4  ~ 3,
+                               marital_status == 5  ~ 4
+                               )
+)
+```
+
+
+```{r}
+Offspring_imp_clean_df = Offspring_imp_clean_df %>% mutate(maritalst =
+                     case_when(maritalst == 1 ~ "Married", 
+                                maritalst == 2  ~ "Single/never married",
+                                maritalst == 3  ~ "Divorced/separated",
+                                maritalst == 4  ~ "Widowed"
+                              
+                               ))
+```
+# Income
+
+```{r}
+
+
+#label define income 1"<$25,000" 2"$25,000-$49,999" 3"$50,000-$75,000" 4"$74,999-$100,000" 5">$100,000"
+
+merged_df = merged_df %>% mutate(income =
+                     case_when(income <= 25,000 ~ 1, 
+                                income  > 25,000 & income  <= 49,999  ~ 2,
+                                income  >= 50,000 & income  < 75,000  ~ 3,
+                                income  >= 75,000  & income  < 100,000  ~ 4,
+                               income  > 100,000 ~ 5
+                               )
+)
+```
+
+
+```{r}
+head(Offspring_imp_clean_df)
+```
+
+
+
+# save it to a dataframe
+
+```{r}
+write.csv(Offspring_imp_clean_df, "Offspring_variables_merged.csv")
+```
+
+
+
+
+
+
+
+
+
+# Samples characteristics
+
+# Descriptives
+
+```{r}
+df <- read_csv("~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Offspring cohort/merging files/Offspring_variables_merged.csv")
+```
+```{r}
+head(df)
+```
+# Percentage of column means
+```{r}
+#summary(df$bmi)
+colMeans(is.na(df))*100
+```
+
+
+
+
+
+# Count of male and female
+
+```{r}
+#dim(merged_df)
+gender_table <- table(df$sex)
+gender_table
+```
+
+#Count the marital status Males
+
+```{r}
+male_status <- filter(df, sex==1)
+
+mmarital_st <- table(male_status$maritalst )
+mmarital_st
+```
+
+```{r}
+prop.table(mmarital_st)
+```
+
+
+# Education level
+```{r}
+
+
+meducation_st <- table(male_status$educ )
+meducation_st
+```
+
+```{r}
+prop.table(meducation_st)
+```
+
+
+
+
+#Count the marital status Females
+
+```{r}
+female_status <- filter(Offspring_imp_clean_df, sex==2)
+
+fmarital_st <- table(female_status$maritalst )
+fmarital_st
+```
+
+```{r}
+prop.table(fmarital_st)
+```
+
+
+# Education level
+```{r}
+
+
+feducation_st <- table(female_status$educ )
+feducation_st
+```
+
+```{r}
+prop.table(feducation_st)
+```
+
+
+# Allostatic Load Variables
+
+#sbp
+```{r}
+
+
+systolic_blood_pressure <- table(Offspring_imp_clean_df$sbp_cat )
+systolic_blood_pressure
+```
+
+
+```{r}
+prop.table(systolic_blood_pressure)
+```
+
+
+#dbp
+```{r}
+
+
+diastolic_bp <- table(Offspring_imp_clean_df$dbp_cat )
+diastolic_bp
+```
+
+
+```{r}
+prop.table(diastolic_bp)
+```
+
+
+#tchol
+```{r}
+
+
+tcholl <- table(Offspring_imp_clean_df$tchol_cat )
+tcholl
+```
+
+
+```{r}
+prop.table(tcholl)
+```
+
+#hdlchol
+```{r}
+
+
+hdlcholl <- table(Offspring_imp_clean_df$hdl_cat )
+hdlcholl
+```
+
+
+```{r}
+prop.table(hdlcholl)
+```
+
+
+#hdlcho_ratio
+
+```{r}
+
+
+hdlchol_ratio <- table(Offspring_imp_clean_df$hdlchol_ratio_cat )
+hdlchol_ratio
+```
+
+
+```{r}
+prop.table(hdlchol_ratio)
+```
+
+
+#hba1c
+```{r}
+
+
+hba1cal <- table(Offspring_imp_clean_df$hba1c_cat )
+hba1cal
+```
+
+
+```{r}
+prop.table(hba1cal)
+```
+
+
+
+#bmi
+```{r}
+
+
+bmi <- table(Offspring_imp_clean_df$bmi_cat )
+bmi
+```
+
+
+```{r}
+prop.table(bmi)
+```
+
+#albumin
+```{r}
+
+
+alb <- table(Offspring_imp_clean_df$alb_cat )
+alb
+```
+
+
+```{r}
+prop.table(alb)
+```
+
+#Creatinine
+```{r}
+
+
+creatal <- table(Offspring_imp_clean_df$creat_cat )
+creatal
+```
+
+
+```{r}
+prop.table(creatal)
+```
+
+
+#C-reactive
+```{r}
+
+
+c_react <- table(df$crp_cat )
+c_react
+```
+
+
+```{r}
+prop.table(c_react)
+```
+
+
+
+
+
+
+# James Gen III Data 
+
+# Samples characteristics
+
+# Descriptives
+
+```{r}
+gen3_df <- read_csv("~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Gen III data/Gen III RAW Variables.csv")
+```
+
+```{r}
+head(gen3_df)
+```
+
+
+```{r}
+summary(gen3_df$alb)
+```
+
+
+```{r}
+summary(gen3_df$hdl)
+```
+
+```{r}
+summary(gen3_df$creat)
+```
+
+# Percenatge of missing data in each column
+
+```{r}
+colMeans(is.na(gen3_df))*100
+```
+
+
+# The dimension
+```{r}
+dim(gen3_df)
+```
+
+
+```{r}
+summary(gen3_df$creat)
+```
+
+
+# Subset variables for multiple imputation
+```{r}
+# Select out variables that could bd used in the imputation process
+gen3_imp <- gen3_df %>% 
+  select(pid,idtype, age1, crp, hba1c, alb, tchol, creat, hdlchol,bmi, sbp, dbp)
+```
+
+
+```{r}
+dim(gen3_imp)
+```
+
+
+
+```{r}
+head(gen3_imp)
+```
+# The distribution of ALbumin against cholesterol
+
+```{r}
+marginplot(gen3_imp[c(12,6)])
+```
+
+
+
+
+
+# mean of alb
+```{r}
+summary(gen3_df$alb)
+```
+
+What values are we missing
+
+```{r}
+
+library(VIM)
+aggr_plot <- aggr(gen3_imp, col=c('lightblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(gen3_imp), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+```
+# Percenatge of missing data in each column
+
+```{r}
+colMeans(is.na(gen3_imp))*100
+```
+
+
+
+
+
+# Multiple Imputation
+
+```{r}
+library(mice)
+# We run the mice code with 0 iterations 
+
+imp <- mice(gen3_imp, maxit=0)
+
+
+# Extract predictorMatrix and methods of imputation 
+
+predM <- imp$predictorMatrix
+meth <- imp$method
+
+
+# Setting values of variables I'd like to leave out to 0 in the predictor matrix
+predM[, c("pid")] <- 0
+predM[, c("idtype")] <- 0
+
+imp2 <- mice(gen3_imp, maxit = 5, 
+             predictorMatrix = predM, 
+             method = meth, print =  FALSE)
+```
+
+```{r}
+ head(predM)
+```
+
+
+
+
+```{r}
+# Look at head and tail of imputed values for alb variable
+head(imp2$imp$alb)
+
+```
+
+
+```{r}
+# Look at head and tail of imputed values for alb variable
+tail(imp2$imp$alb)
+
+```
+# Find the means of imputed alb columns and compare with mean of alb un-imputed = 4.465
+
+```{r}
+mean(imp2$imp$alb[, 1])
+```
+
+```{r}
+mean(imp2$imp$alb[, 2])
+```
+
+```{r}
+mean(imp2$imp$alb[, 3])
+```
+
+```{r}
+mean(imp2$imp$alb[, 4])
+```
+
+
+```{r}
+mean(imp2$imp$alb[, 5])
+```
+
+# INspecting the distribution of original and imputed data
+
+```{r}
+xyplot(imp2, alb ~ crp + hba1c+ tchol+ creat+ hdlchol+ bmi+ sbp+ dbp, pch=18, cex=1)
+
+```
+What we would like to see is that the shape of the magenta points(imputed) matches the shape of the blue ones (observed). The matching shape tells us that the imputed values are indeed "plausible value". 
+
+
+# Another helpful plot
+
+```{r}
+densityplot(imp2)
+```
+
+The density of the imputed data for each imputed dataset is showed in magenta, while the density of the observed data is showed in blue. From the previous assumption we expect the distribution to be similar. 
+
+
+# Stripplot
+
+```{r}
+stripplot(imp2, pch=20, cex=1.2)
+```
+
+
+```{r}
+modelFit1 <- with(imp2,lm(alb~ bmi + hba1c + sbp))
+summary(pool(modelFit1))
+```
+
+
+# Create complete dataset dataframe
+
+```{r}
+completeData <- complete(imp2,4)
+
+head(completeData)
+```
+
+
+# Subset variables for multiple imputation
+```{r}
+# Select out variables that could bd used in the imputation process
+imputed_gen3<- completeData %>% 
+  select(pid,alb, creat)
+head(imputed_gen3)
+```
+
+# rename the columns
+```{r}
+renamed_imputed_gen3 <- imputed_gen3 %>% 
+  rename(
+    alb_imp = alb,
+    creat_imp = creat
+    )
+
+head(renamed_imputed_gen3)
+```
+```{r}
+summary(renamed_imputed_gen3$alb_imp)
+```
+
+
+# save it to a dataframe
+
+```{r}
+write.csv(renamed_imputed_gen3, "imputedGen3Data.csv")
+```
+
+
+# Merging the files demographics
+
+```{r}
+Gen3_imp_clean_df <- merge(gen3_df, renamed_imputed_gen3, by="pid", all=T)
+
+# check dimensions
+dim(Gen3_imp_clean_df)
+```
+
+```{r}
+summary(Gen3_imp_clean_df$creat_imp)
+```
+
+# save it to a dataframe
+
+```{r}
+write.csv(Gen3_imp_clean_df, "Gen3ImputedData_clean.csv")
+```
+
+
+
+# t_test
+#The most commonly used test is a t-test to compare two means. This is the unpaired test by comparing the mean age1 in males and females. 
+
+```{r}
+t.test(Gen3_imp_clean_df$age1  ~  Gen3_imp_clean_df$sex) 
+```
+
+
+
+# Count of male and female
+
+```{r}
+#dim(merged_df)
+gender_table2 <- table(Gen3_imp_clean_df$sex)
+gender_table2
+```
+
+```{r}
+prop.table(gender_table2)
+```
+
+
+#Count the marital status Males
+
+```{r}
+male_status2 <- filter(Gen3_imp_clean_df, sex=="Male")
+
+mmarital_st2 <- table(male_status2$maritalst )
+mmarital_st2
+```
+
+```{r}
+prop.table(mmarital_st2)
+```
+
+
+# Education level
+```{r}
+
+
+meducation_st2 <- table(male_status2$educ )
+meducation_st2
+```
+
+```{r}
+prop.table(meducation_st2)
+```
+
+
+
+
+#Count the marital status Females
+
+```{r}
+female_status2 <- filter(Gen3_imp_clean_df, sex=="Female")
+
+fmarital_st2 <- table(female_status2$maritalst )
+fmarital_st2
+```
+
+```{r}
+prop.table(fmarital_st2)
+```
+
+
+# Education level
+```{r}
+
+
+feducation_st2 <- table(female_status2$educ )
+feducation_st2
+```
+
+```{r}
+prop.table(feducation_st2)
+```
+
+
+# Allostatic Load Variables
+
+#sbp
+```{r}
+
+
+systolic_bp2 <- table(Gen3_imp_clean_df$sbp_cat )
+systolic_bp2
+```
+
+
+```{r}
+prop.table(systolic_bp2)
+```
+
+
+#dbp
+```{r}
+
+
+diastolic_bp2 <- table(Gen3_imp_clean_df$dbp_cat )
+diastolic_bp2
+```
+
+
+```{r}
+prop.table(diastolic_bp2)
+```
+
+
+#tchol
+```{r}
+
+
+tcholl2 <- table(Gen3_imp_clean_df$tchol_cat )
+tcholl2
+```
+
+
+```{r}
+prop.table(tcholl2)
+```
+
+#hdlchol
+```{r}
+
+
+hdlcholl2 <- table(Gen3_imp_clean_df$hdl_cat )
+hdlcholl2
+```
+
+```{r}
+dim(Gen3_imp_clean_df)
+```
+
+
+```{r}
+prop.table(hdlcholl2)
+```
+
+
+#hdlcho_ratio
+```{r}
+
+
+thdlchol_ratio2 <- table(Gen3_imp_clean_df$thdlchol_ratio )
+thdlchol_ratio2
+```
+
+
+```{r}
+prop.table(thdlchol_ratio2)
+```
+
+
+#hba1c
+```{r}
+
+
+hba1cal2 <- table(Gen3_imp_clean_df$hba1c_cat )
+hba1cal2
+```
+
+
+```{r}
+prop.table(hba1cal2)
+```
+
+
+
+#bmi
+```{r}
+
+
+bmi2 <- table(Gen3_imp_clean_df$bmi_cat )
+bmi2
+```
+
+
+```{r}
+prop.table(bmi2)
+```
+
+#albumin
+
+```{r}
+dim(merged_imp2)
+```
+
+# Recode albumin
+
+```{r}
+
+merged_imp2 = Gen3_imp_clean_df %>% mutate(alb_cat1 =
+                     case_when(alb_imp < 3 ~ 1, 
+                                alb_imp >= 3 & alb < 3.8  ~ 0.5,
+                                alb_imp >= 3.8  ~ 0
+                               
+                               ))
+
+```
+
+
+```{r}
+
+
+alb2 <- table(merged_imp2$alb_cat1 )
+alb2
+```
+
+
+```{r}
+prop.table(alb2)
+```
+
+
+
+# Recode c-creatinine
+
+```{r}
+
+creat_imp3 = Gen3_imp_clean_df %>% mutate(creat_cat1 =
+                     case_when(creat_imp > 1.16 & sex =="Male"  ~ 1, 
+                                creat_imp > 0.93 & sex =="Female"  ~ 1,
+                                creat_imp >= 0.63 & creat_imp <=1.16  & sex =="Male"  ~ 0.5,
+                                creat_imp >= 0.48 & creat_imp <=0.93  & sex =="Female"  ~ 0.5,
+                                creat_imp < 0.63  & sex =="Male" ~ 0,
+                                creat_imp < 0.48 & sex =="Female" ~ 0
+                              
+                               )
+)
+
+```
+
+```{r}
+head(creat_imp3$creat_cat1)
+```
+
+
+
+#Creatinine
+```{r}
+
+
+creatal2 <- table(creat_imp3$creat_cat1 )
+creatal2
+```
+
+
+```{r}
+prop.table(creatal2)
+```
+
+
+#C-reactive
+```{r}
+
+
+c_react2 <- table(Gen3_imp_clean_df$crp_cat )
+c_react2
+```
+
+
+```{r}
+prop.table(c_react2)
+```
+
+
+
+
+
+
+```{r}
+colnames(df2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Count the unique Elements in Education status column
+
+```{r}
+table(merged_df$b43)
+```
+
+
+# Load required packages for statistics
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+```
+# Summary statistics
+
+```{r}
+merged_df %>% 
+  group_by(sex) %>% 
+  get_summary_stats(bmi, type = "mean_sd")
+```
+
+# Summary 
+
+```{r}
+summary(df$marital_status)
+```
+
+```{r}
+summary(df$years_of_education)
+```
+
+
+
+
+
+# Create factors for sex 
+
+```{r}
+table( factor(merged_df$sex,labels=c("male","female")) ) 
+```
+
+
+```{r}
+merged_df$sex <- factor(merged_df$sex,  labels=c("male","female")  )
+table(merged_df$sex)
+```
+
+
+
+
+# Proportion of male and female
+
+```{r}
+prop.table(gender_table)
+```
+
+# Mean age for male and Female
+# calculating some summary statistics for males and females
+```{r}
+merged_df$sex   <-   factor(merged_df$sex,  labels=c("male","female")  )
+summary(merged_df$age1[ merged_df$sex=="female"]  )
+```
+
+```{r}
+summary(merged_df$age1[ merged_df$sex=="male"]  )
+```
+
+# t_test
+#The most commonly used test is a t-test to compare two means. This is the unpaired test by comparing the mean age1 in males and females. 
+
+```{r}
+t.test(merged_df$age1  ~  merged_df$sex) 
+```
+# Assuming equal variance
+
+```{r}
+t.test(merged_df$age1  ~  merged_df$sex,   var.equal=TRUE)
+```
+# Chi-squared tests
+
+## Chi-squared tests are used to assess patterns in tables of frequencies or counts sometimes called contingency tables. The test checks for independence between the factors that define the table. Testing independence in tables of frequencies requires us to first create the table
+
+
+```{r}
+myTable <- table(merged_df$sex,  merged_df$smoking)
+chisq.test(myTable)
+```
+
+
+```{r}
+quantile(merged_df$bmi, na.rm = TRUE)
+```
+
+# group by
+
+```{r}
+#t.test(merged_df$sex, mu=0)
+merged_df %>% 
+  group_by(sex) %>% 
+  summarise(
+    count = n(),
+    mean = mean(bmi, na.rm=TRUE),
+    sd = sd(bmi, na.rm = TRUE)
+    
+  )
+
+```
+# Box plot viz
+
+```{r}
+
+  ggplot(merged_df, aes(bmi, as.factor(sex) ))+
+         geom_boxplot(aes(colour=as.factor(sex)))+
+          labs (y="BMI",
+                x= "Gender")
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+# https://www2.le.ac.uk/departments/health-sciences/information-for-students/j-thompson-pages/basic-statics-with-r

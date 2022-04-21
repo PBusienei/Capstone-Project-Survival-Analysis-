@@ -1,0 +1,400 @@
+---
+title: "Data Imputation"
+output: html_notebook
+---
+
+#import the libraries
+
+```{r}
+library(magrittr)
+library(tidyr)
+library(VIM)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+```
+
+# Load the merged dataset
+```{r}
+
+combined_offspring <- read_excel("~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Offspring cohort/Combined file excel_offspring2.xls")
+View(combined_offspring)
+```
+
+# check all colums for null values 
+```{r}
+combined_offspring %>% is.na() %>% colSums()
+```
+```{r}
+head(combined_offspring)
+```
+
+```{r}
+combined_offspring %>% 
+  select(pid, idtype, sex, age1, bmi, a9, a10, a31, a35, a50, a53, a54, a55, a56, crp6, dheas, epi, aldo) %>% 
+  aggr(combined= TRUE, numbers=TRUE)
+
+```
+
+```{r}
+mean(combined_offspring$age1)
+```
+```{r}
+# Save the data in two different vector
+women_weight <- genderweight %>%
+  filter(group == "F") %>%
+  pull(weight)
+men_weight <- genderweight %>%
+  filter(group == "M") %>%
+  pull(weight)
+# Compute t-test
+res <- t.test(women_weight, men_weight)
+res
+# Compute t-test
+res <- t.test(wom, men_weight, var.equal = TRUE)
+res
+
+```
+
+```{r}
+genderweight %>%
+  group_by(group) %>%
+  get_summary_stats(weight, type = "mean_sd")
+```
+
+## Mean Imputation 
+
+# mean imputation of height Weigh in Nhanes dataset
+
+```{r}
+nhanes <- NHANES %>% 
+  mutate(height_imp = ifelse(is.na(Height), TRUE, FALSE)) %>% 
+  mutate(weight_imp = ifelse(is.na(Weight), TRUE, FALSE))
+
+
+
+## Replacing the missing values in height and Weight with their respective means
+
+nhanes_imp <- nhanes %>% 
+  mutate(height_imp = ifelse(is.na(Height), mean(Height, na.rm = TRUE), Height)) %>% 
+  mutate(weight_imp = ifelse(is.na(Weight), mean(Weight, na.rm = TRUE), Weight))
+  
+
+
+nhanes_imp %>% 
+  select(Weight, Height, weight_imp, height_imp ) %>% 
+  head()
+```
+
+
+# hot-deck imputation - feed forward
+
+```{r}
+
+```
+
+# k-Nearest-Neighbors imputation
+
+```{r}
+# sort variables 
+vars_by_NAs <- nhanes %>% 
+  is.na() %>% 
+  colSums() %>% 
+  sort(decreasing = FALSE) %>% 
+  names()
+
+
+# Having sorted the variables
+
+nhanes_imp <- nhanes %>% 
+  select(vars_by_NAs) %>% 
+  kNN(k=5)
+
+
+```
+
+
+```{r}
+
+```
+
+
+
+
+# datatpes
+```{r}
+str(combined_offspring, 10)
+```
+
+# Impute the aldo variable 
+
+K=30
+```{r}
+aldo_epi <- kNN(combined_offspring, k = 5, variable = c("aldo", "epi"))
+```
+
+#head
+
+```{r}
+head(aldo_epi)
+```
+# Weighted donors 
+
+```{r}
+aldo_epi <- combined_offspring %>% 
+  kNN(variable = c("aldo", "epi"),
+      k = 5,
+      numFun = weighted.mean(),
+      weightDist = TRUE)                
+```
+
+
+
+# Draw a margin plot of bmi vs aldosterone
+
+```{r}
+aldo_imp30 %>% 
+  select(bmi, aldo, aldo_imp) %>% 
+  marginplot(delimiter = "imp", main = "k=30")
+```
+
+K15
+```{r}
+aldo_imp15 <- kNN(combined_offspring, k = 15, variable = "aldo")
+```
+
+```{r}
+aldo_imp15 %>% 
+  select(bmi, aldo, aldo_imp) %>% 
+  marginplot(delimiter = "imp", main = "k=15")
+```
+
+
+```{r}
+aldo_imp <- kNN(combined_offspring, k = 5, variable = "aldo")
+```
+
+# Draw a margin plot of bmi vs aldosterone
+
+```{r}
+aldo_imp %>% 
+  select(a55, aldo, aldo_imp) %>% 
+  marginplot(delimiter = "imp", main = "k=5")
+```
+# K2
+
+```{r}
+aldo_imp2 <- kNN(combined_offspring, k = 2, variable = "aldo")
+```
+
+
+```{r}
+aldo_imp2 %>% 
+  select(a55, aldo, aldo_imp) %>% 
+  marginplot(delimiter = "imp", main = "k=2")
+```
+# Impute using distance weighted mean
+
+```{r}
+aldo_weighted_im <- kNN(combined_offspring,
+                        k=3,
+                        variable = "aldo",
+                        numFun = weighted.mean,
+                        weightDist = TRUE)
+                        
+```
+
+
+```{r}
+head(aldo_weighted_im)
+```
+
+```{r}
+mean
+```
+
+
+#marginplot
+
+```{r}
+aldo_weighted_im %>% 
+  select(a138, aldo, aldo_imp) %>% 
+  marginplot(delimiter = "imp")
+```
+
+```{r}
+colnames(combined_offspring)
+```
+
+# Subset Data for only the required variables 
+
+```{r}
+allostatic_loads <- combined_offspring %>% 
+  select(pid, idtype, sex, bmi, a9, a10, a31, a35, a50, a55, a56, crp6, dheas, epi, aldo)
+```
+
+
+
+# Get combine offsprings Sorted by number of  NAs
+
+```{r}
+vars_by_NAs <- combined_offspring %>% 
+  is.na() %>% 
+  colSums() %>% 
+  sort(decreasing = FALSE) %>% 
+  names()
+```
+
+# Sort combined offsprings variables and feed it to kNN imputation
+```{r}
+combined_offspring_imp <- combined_offspring %>% 
+  select(vars_by_NAs) %>% 
+  kNN(variable = c("bmi","a9","a10","a31","a35","a50","a55", "crp6","dheas","epi", "aldo"))
+```
+
+# marginplot
+```{r}
+combined_offspring_imp %>% 
+  select(bmi, aldo, aldo_imp) %>% 
+  marginplot(delimiter = "imp")
+```
+
+
+
+#Check 
+```{r}
+head(combined_offspring_imp)
+```
+
+null values
+```{r}
+combined_offspring_imp %>% is.na() %>% colSums()
+```
+
+# Save to xls file
+```{r}
+write.csv(combined_offspring_imp, "~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Offspring cohort/imputed_data.csv")
+```
+
+#Imputed Dataframe
+```{r}
+imputed_data <- read_csv("~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Offspring cohort/imputed_data.csv")
+head(imputed_data)
+```
+
+
+```{r}
+dim(imputed_data)
+```
+
+# Saved as excel
+```{r}
+library(writexl)
+write_xlsx(combined_offspring_imp, "~/Library/CloudStorage/Box-Box/FHS DATA_Mogos_James/PETER_FHSproject/Project work/data/Offspring cohort/imputed_excel.xlsx")
+```
+
+
+# kNN imputation
+```{r}
+offspring_imp <- kNN(combined_offspring, k = 5, variable = c("crp6", "aldo"))
+```
+
+# Looking at the imputed data
+
+```{r}
+offspring_imp %>% is.na() %>% colSums()
+```
+# Model-based imoputation Approach
+## linear regression imputation of continues  variables
+```{r}
+#install.packages('simputation', dependencies=TRUE)
+library(simputation)
+```
+
+
+# Single linear regression imputation
+
+```{r}
+lin_regression_imp <- impute_lm(combined_offspring, aldo + a55 ~.)
+```
+
+
+# Initialize the missing Values with hoddeck and save missing locations
+```{r}
+offsprings_m_imp <- hotdeck(combined_offspring)
+
+missing_crp6 <- offsprings_m_imp$crp6_imp
+missing_aldo <- offsprings_m_imp$aldo_imp
+```
+
+# Iterate over the crp6 and aldo 5 times, imputing them at the originally missing locations
+
+```{r}
+for (i in 1:5){
+  #prev_iter <- offsprings_m_imp
+  offsprings_m_imp$crp6[missing_crp6] <-NA
+  offsprings_m_imp <- impute_lm(offsprings_m_imp, crp6 ~ bmi+a9 +a10+a55)
+  offsprings_m_imp$aldo[missing_aldo] <-NA
+  offsprings_m_imp <- impute_lm(offsprings_m_imp, aldo ~ bmi + a9 +a10 +crp6)
+  #diff_crp6 <- c(diff_crp6, mapc(prev_iter$crp6, offsprings_m_imp$crp6))
+  #diff_aldo <- c(diff_aldo, mapc(prev_iter$aldo, offsprings_m_imp$aldo))
+  
+}
+```
+
+
+```{r}
+mapc <- function(a, b){
+  mean(abs(b - a) / a, na.rm = TRUE)
+}
+```
+
+
+# Detecting convergence
+
+```{r}
+#library(purrr)
+# Detecting the convergence
+diff_crp6 <- c()
+diff_aldo <- c()
+# For loop
+for (i in 1:5){
+  prev_iter <- offsprings_m_imp
+  offsprings_m_imp$crp6[missing_crp6] <-NA
+  offsprings_m_imp <- impute_lm(offsprings_m_imp, crp6 ~ bmi+a9 +a10+a55)
+  offsprings_m_imp$aldo[missing_aldo] <-NA
+  offsprings_m_imp <- impute_lm(offsprings_m_imp, aldo ~ bmi + a9 +a10 +crp6)
+  diff_crp6 <- c(diff_crp6, mapc(prev_iter$crp6, offsprings_m_imp$crp6))
+  diff_aldo <- c(diff_aldo, mapc(prev_iter$aldo, offsprings_m_imp$aldo))
+  
+}
+```
+
+
+# Difference between 
+
+```{r}
+diff_crp6
+```
+
+
+
+
+Load combine datasets
+```{r}
+model_imp <- impute_lm(combined_offspring, crp6 + aldo ~.) 
+```
+
+
+
+```{r}
+# https://dept.stat.lsa.umich.edu/~jerrick/courses/stat701/notes/mi.html
+
+# https://stefvanbuuren.name/fimd/sec-knowledge.html
+
+
+#data <- boys[, c("age", "hgt", "wgt", "hc", "reg")]
+
+#data
+```
+
